@@ -69,7 +69,7 @@ class qa_rotator_cc(gr_unittest.TestCase):
             self.assertComplexAlmostEqual(x, y, places=5)
 
     def test_002_t(self):
-        """Rotator phase increment update via control message
+        """Phase increment update at specified offset via control message
         """
 
         new_f_shift   = 0.016  # new rotator's frequency
@@ -120,6 +120,7 @@ class qa_rotator_cc(gr_unittest.TestCase):
         self.assertEqual(len(tags), 1)
         for tag in tags:
             self.assertAlmostEqual(pmt.to_double(tag.value), new_phase_inc)
+            self.assertEqual(tag.offset, offset)
 
         for i,(x,y) in enumerate(zip(self.sink.data(), expected_samples)):
             try:
@@ -129,6 +130,70 @@ class qa_rotator_cc(gr_unittest.TestCase):
                     i, np.angle(x), np.angle(y)))
                 raise e
 
+    def test_003_t(self):
+        """Immediate phase increment update via control message
+
+        In this test, the control message does not include the "offset"
+        key. Hence, the rotator is expected to update its phase increment
+        immediately, rather than at a specified sample offset.
+
+        """
+
+        new_f_shift   = 0.016  # new rotator's frequency
+        msg_period_ms = 0      # periodicity (in ms) of increment update message
+
+        new_phase_inc = float(2 * np.pi * new_f_shift)
+        f_out         = self.f_in + new_f_shift  # after update
+
+        # Message to be sent to the rotator in order to update its increment
+        ctrl_msg = pmt.make_dict()
+        ctrl_msg = pmt.dict_add(ctrl_msg,
+                                pmt.intern("inc"),
+                                pmt.from_double(new_phase_inc))
+
+        rot_ctrl = blocks.message_strobe(ctrl_msg, msg_period_ms)
+
+        # Rotator will place a tag on the sample where the new increment starts
+        tag_sink = blocks.tag_debug(gr.sizeof_gr_complex, "new_inc", "new_inc")
+
+        # Expected samples (all of them with the new frequency set via message)
+        expected_angles  = 2 * np.pi * np.arange(self.n_samples) * f_out
+        expected_samples = np.exp(1j*expected_angles)
+
+        self.tb.connect(self.source, self.rotator_cc)
+        self.tb.msg_connect(rot_ctrl, "strobe", self.rotator_cc, "phase_inc")
+        self.tb.connect(self.rotator_cc, self.sink)
+        self.tb.connect(self.rotator_cc, tag_sink)
+
+        self.tb.start()
+        time.sleep(1)
+        self.tb.stop()
+        self.tb.wait()
+
+        tags = tag_sink.current_tags()
+        self.assertEqual(len(tags), 1)
+        for tag in tags:
+            self.assertAlmostEqual(pmt.to_double(tag.value), new_phase_inc)
+            self.assertEqual(tag.offset, 1)
+            # NOTE: the tag is expected on the second sample (index 1). This is
+            # mostly due to the ordering of rotator operation. First it rotates
+            # the input sample, then it accumulates the phase increment. As a
+            # result, the first sample processed by the "work function" always
+            # has its rotating phase defined after the rotation of the last
+            # sample from the previous "work" call. So it is only possible to
+            # apply the update starting from the second sample of the batch.
+            #
+            # During initialization, the starting phase will be zero anyway, so
+            # the first input sample (index 0) will be multiplied by 1
+            # regardless.
+
+        for i,(x,y) in enumerate(zip(self.sink.data(), expected_samples)):
+            try:
+                self.assertComplexAlmostEqual(x, y, places=5)
+            except AssertionError as e:
+                print("Error on sample %d - angle %f != angle %f" %(
+                    i, np.angle(x), np.angle(y)))
+                raise e
 
 if __name__ == '__main__':
     gr_unittest.run(qa_rotator_cc)
