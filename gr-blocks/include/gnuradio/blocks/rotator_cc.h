@@ -54,8 +54,11 @@ public:
     /*!
      * \brief Make an complex rotator block
      * \param phase_inc rotational velocity
+     * \param tag_inc_updates if phase increment is updated following the
+     * reception of a control message received via the input message port, tag
+     * the sample where the new increment starts to take effect.
      */
-    static sptr make(double phase_inc = 0.0);
+    static sptr make(double phase_inc = 0.0, bool tag_inc_updates = false);
 
     virtual void set_phase_inc(double phase_inc) = 0;
 };

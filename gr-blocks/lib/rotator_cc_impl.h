@@ -36,15 +36,16 @@ namespace blocks {
 class rotator_cc_impl : public rotator_cc
 {
 private:
-    rotator d_r;
+    rotator  d_r;
+    bool     d_tag_inc_updates;
     uint64_t d_idx_next_inc_update;
-    double d_next_phase_inc;
-    bool d_inc_update_pending;
+    double   d_next_phase_inc;
+    bool     d_inc_update_pending;
 
     void handle_phase_inc_msg(pmt::pmt_t msg);
 
 public:
-    rotator_cc_impl(double phase_inc = 0.0);
+    rotator_cc_impl(double phase_inc = 0.0, bool tag_inc_updates = false);
     ~rotator_cc_impl();
 
     void set_phase_inc(double phase_inc);
