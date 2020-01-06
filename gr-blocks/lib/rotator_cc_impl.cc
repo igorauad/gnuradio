@@ -49,9 +49,10 @@ rotator_cc_impl::rotator_cc_impl(double phase_inc, bool tag_inc_updates)
 {
     set_phase_inc(phase_inc);
 
-    message_port_register_in(pmt::mp("phase_inc"));
+    const pmt::pmt_t port_id = pmt::mp("phase_inc");
+    message_port_register_in(port_id);
     set_msg_handler(
-        pmt::mp("phase_inc"),
+        port_id,
         boost::bind(&rotator_cc_impl::handle_phase_inc_msg, this, _1));
 }
 
