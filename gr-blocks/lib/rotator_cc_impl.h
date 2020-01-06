@@ -37,6 +37,11 @@ class rotator_cc_impl : public rotator_cc
 {
 private:
     rotator d_r;
+    uint64_t d_idx_next_inc_update;
+    double d_next_phase_inc;
+    bool d_inc_update_pending;
+
+    void handle_phase_inc_msg(pmt::pmt_t msg);
 
 public:
     rotator_cc_impl(double phase_inc = 0.0);

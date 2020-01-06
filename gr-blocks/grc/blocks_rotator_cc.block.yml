@@ -11,6 +11,9 @@ parameters:
 inputs:
 -   domain: stream
     dtype: complex
+-   domain: message
+    id: phase_inc
+    optional: true
 
 outputs:
 -   domain: stream
