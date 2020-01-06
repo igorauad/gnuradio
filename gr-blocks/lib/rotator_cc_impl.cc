@@ -40,9 +40,17 @@ rotator_cc::sptr rotator_cc::make(double phase_inc)
 rotator_cc_impl::rotator_cc_impl(double phase_inc)
     : sync_block("rotator_cc",
                  io_signature::make(1, 1, sizeof(gr_complex)),
-                 io_signature::make(1, 1, sizeof(gr_complex)))
+                 io_signature::make(1, 1, sizeof(gr_complex))),
+    d_idx_next_inc_update(0),
+    d_next_phase_inc(0.0),
+    d_inc_update_pending(false)
 {
     set_phase_inc(phase_inc);
+
+    message_port_register_in(pmt::mp("phase_inc"));
+    set_msg_handler(
+        pmt::mp("phase_inc"),
+        boost::bind(&rotator_cc_impl::handle_phase_inc_msg, this, _1));
 }
 
 rotator_cc_impl::~rotator_cc_impl() {}
@@ -50,6 +58,19 @@ rotator_cc_impl::~rotator_cc_impl() {}
 void rotator_cc_impl::set_phase_inc(double phase_inc)
 {
     d_r.set_phase_incr(exp(gr_complex(0, phase_inc)));
+}
+
+void rotator_cc_impl::handle_phase_inc_msg(pmt::pmt_t msg)
+{
+    if (pmt::is_pair(msg)) {
+        pmt::pmt_t offset    = pmt::car(msg);
+        pmt::pmt_t phase_inc = pmt::cdr(msg);
+        if (pmt::is_uint64(offset) && pmt::is_real(phase_inc)) {
+            d_idx_next_inc_update = pmt::to_uint64(offset);
+            d_next_phase_inc      = pmt::to_double(phase_inc);
+            d_inc_update_pending  = true;
+        }
+    }
 }
 
 int rotator_cc_impl::work(int noutput_items,
@@ -63,7 +84,23 @@ int rotator_cc_impl::work(int noutput_items,
       for (int i=0; i<noutput_items; i++)
       	out[i] = d_r.rotate(in[i]);
 #else
-    d_r.rotateN(out, in, noutput_items);
+    int items_before_update, items_after_update;
+    /* If there is a phase increment update scheduled, handle rotation in two
+     * steps and update the phase increment in between. */
+    if (d_inc_update_pending &&
+        d_idx_next_inc_update >= nitems_written(0) &&
+        d_idx_next_inc_update < (nitems_written(0) + noutput_items)) {
+        items_before_update = d_idx_next_inc_update - nitems_written(0);
+        items_after_update  = noutput_items - items_before_update;
+
+        d_r.rotateN(out, in, items_before_update);
+        set_phase_inc(d_next_phase_inc);
+        d_r.rotateN(out + items_before_update, in + items_before_update,
+                    items_after_update);
+
+        d_inc_update_pending = false;
+    } else
+        d_r.rotateN(out, in, noutput_items);
 #endif
 
     return noutput_items;

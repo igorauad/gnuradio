@@ -32,6 +32,18 @@ namespace blocks {
 /*!
  * \brief Complex rotator
  * \ingroup math_operators_blk
+ *
+ * \details
+ *
+ * Message Ports:
+ *
+ * phase_inc (input):
+ *
+ *    Receives a PMT pair with a new phase increment to be set on the rotator at
+ *    a specified output sample index. The first element of the pair should be
+ *    the index (as an absolute output item number) on which the phase increment
+ *    update should be handled, given as a PMT uint64. The second element, in
+ *    turn, should be the desired new phase increment, given as a PMT double.
  */
 class BLOCKS_API rotator_cc : virtual public sync_block
 {
