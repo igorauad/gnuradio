@@ -89,10 +89,18 @@ int rotator_cc_impl::work(int noutput_items,
     int items_before_update, items_after_update;
     /* If there is a phase increment update scheduled, handle rotation in two
      * steps and update the phase increment in between. */
+    const uint64_t n_written = nitems_written(0);
     if (d_inc_update_pending &&
-        d_idx_next_inc_update >= nitems_written(0) &&
-        d_idx_next_inc_update < (nitems_written(0) + noutput_items)) {
-        items_before_update = d_idx_next_inc_update - nitems_written(0);
+        d_idx_next_inc_update > n_written &&
+        d_idx_next_inc_update <= (n_written + noutput_items)) {
+
+        items_before_update = d_idx_next_inc_update - n_written - 1;
+        /* NOTE: the rotator operator first rotates the sample, then updates its
+         * phase accumulator. This means that the n-th sample is rotated with
+         * the phase increment that the rotator had when processing sample
+         * n-1. Hence, in order for the update to start taking effect on sample
+         * n, we must ensure that on sample n-1 the rotator already has the new
+         * increment. The "-1" term is meant to address this. */
         items_after_update  = noutput_items - items_before_update;
 
         d_r.rotateN(out, in, items_before_update);
@@ -102,7 +110,7 @@ int rotator_cc_impl::work(int noutput_items,
 
         if (d_tag_inc_updates) {
             add_item_tag(0,
-                         nitems_written(0) + items_before_update,
+                         nitems_written(0) + items_before_update + 1,
                          pmt::string_to_symbol("new_inc"),
                          pmt::from_float(d_next_phase_inc));
         }
