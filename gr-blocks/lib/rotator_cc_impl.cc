@@ -32,15 +32,17 @@
 namespace gr {
 namespace blocks {
 
-rotator_cc::sptr rotator_cc::make(double phase_inc)
+rotator_cc::sptr rotator_cc::make(double phase_inc, bool tag_inc_updates)
 {
-    return gnuradio::get_initial_sptr(new rotator_cc_impl(phase_inc));
+    return gnuradio::get_initial_sptr(new rotator_cc_impl(phase_inc,
+                                                          tag_inc_updates));
 }
 
-rotator_cc_impl::rotator_cc_impl(double phase_inc)
+rotator_cc_impl::rotator_cc_impl(double phase_inc, bool tag_inc_updates)
     : sync_block("rotator_cc",
                  io_signature::make(1, 1, sizeof(gr_complex)),
                  io_signature::make(1, 1, sizeof(gr_complex))),
+    d_tag_inc_updates(tag_inc_updates),
     d_idx_next_inc_update(0),
     d_next_phase_inc(0.0),
     d_inc_update_pending(false)
@@ -97,6 +99,13 @@ int rotator_cc_impl::work(int noutput_items,
         set_phase_inc(d_next_phase_inc);
         d_r.rotateN(out + items_before_update, in + items_before_update,
                     items_after_update);
+
+        if (d_tag_inc_updates) {
+            add_item_tag(0,
+                         nitems_written(0) + items_before_update,
+                         pmt::string_to_symbol("new_inc"),
+                         pmt::from_float(d_next_phase_inc));
+        }
 
         d_inc_update_pending = false;
     } else
