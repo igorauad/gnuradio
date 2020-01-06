@@ -81,8 +81,13 @@ class qa_rotator_cc(gr_unittest.TestCase):
         f_out_2       = self.f_in + new_f_shift  # after update
 
         # Message to be sent to the rotator in order to update its increment
-        ctrl_msg = pmt.cons(pmt.from_uint64(offset),
-                            pmt.from_double(new_phase_inc))
+        ctrl_msg = pmt.make_dict()
+        ctrl_msg = pmt.dict_add(ctrl_msg,
+                                pmt.intern("inc"),
+                                pmt.from_double(new_phase_inc))
+        ctrl_msg = pmt.dict_add(ctrl_msg,
+                                pmt.intern("offset"),
+                                pmt.from_uint64(offset))
 
         rot_ctrl = blocks.message_strobe(ctrl_msg, msg_period_ms)
 

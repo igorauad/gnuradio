@@ -39,11 +39,13 @@ namespace blocks {
  *
  * phase_inc (input):
  *
- *    Receives a PMT pair with a new phase increment to be set on the rotator at
- *    a specified output sample index. The first element of the pair should be
- *    the index (as an absolute output item number) on which the phase increment
- *    update should be handled, given as a PMT uint64. The second element, in
- *    turn, should be the desired new phase increment, given as a PMT double.
+ *    Receives a PMT dictionary with a new phase increment to be set on the
+ *    rotator at a specified output sample index. The new increment should be
+ *    provided with key "inc" and given as a PMT double. The index (as an
+ *    absolute output item number) on which the phase increment update should be
+ *    handled should be provided with key "offset" and given as a PMT
+ *    uint64. The "offset" key is optional and, when not provided, the new phase
+ *    increment is configured in the rotator immediately.
  */
 class BLOCKS_API rotator_cc : virtual public sync_block
 {

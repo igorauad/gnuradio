@@ -65,14 +65,29 @@ void rotator_cc_impl::set_phase_inc(double phase_inc)
 
 void rotator_cc_impl::handle_phase_inc_msg(pmt::pmt_t msg)
 {
-    if (pmt::is_pair(msg)) {
-        pmt::pmt_t offset    = pmt::car(msg);
-        pmt::pmt_t phase_inc = pmt::cdr(msg);
-        if (pmt::is_uint64(offset) && pmt::is_real(phase_inc)) {
-            d_idx_next_inc_update = pmt::to_uint64(offset);
-            d_next_phase_inc      = pmt::to_double(phase_inc);
-            d_inc_update_pending  = true;
+    const pmt::pmt_t inc_key    = pmt::intern("inc");
+    const pmt::pmt_t offset_key = pmt::intern("offset");
+
+    if (pmt::is_dict(msg)) {
+        /* New phase increment (mandatory) */
+        if (!pmt::dict_has_key(msg, inc_key))
+            throw std::runtime_error("rotator_cc: Control message must contain \"inc\" key");
+
+        d_next_phase_inc = pmt::to_double(pmt::dict_ref(msg, inc_key,
+                                                        pmt::PMT_NIL));
+
+        /* Absolute sample offset when update is to be applied (optional) */
+        if (pmt::dict_has_key(msg, offset_key)) {
+            d_idx_next_inc_update = pmt::to_uint64(pmt::dict_ref(msg,
+                                                                 offset_key,
+                                                                 pmt::PMT_NIL));
+        } else {
+            d_idx_next_inc_update = nitems_written(0) + 1; // update right away
         }
+
+        d_inc_update_pending  = true;
+    } else {
+        throw std::runtime_error("rotator_cc: Control message must be a PMT dictionary");
     }
 }
 
