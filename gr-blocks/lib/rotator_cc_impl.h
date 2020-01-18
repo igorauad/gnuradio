@@ -25,6 +25,7 @@
 
 #include <gnuradio/blocks/rotator.h>
 #include <gnuradio/blocks/rotator_cc.h>
+#include <queue>
 
 namespace gr {
 namespace blocks {
@@ -36,11 +37,12 @@ namespace blocks {
 class rotator_cc_impl : public rotator_cc
 {
 private:
-    rotator  d_r;
-    bool     d_tag_inc_updates;
-    uint64_t d_idx_next_inc_update;
-    double   d_next_phase_inc;
-    bool     d_inc_update_pending;
+    rotator                                 d_r;
+    bool                                    d_tag_inc_updates;
+    std::queue<std::pair<uint64_t, double>> d_inc_update_queue;
+    uint64_t                                d_idx_next_inc_update;
+    double                                  d_next_phase_inc;
+    bool                                    d_inc_update_pending;
 
     void handle_phase_inc_msg(pmt::pmt_t msg);
 
