@@ -71,23 +71,21 @@ void rotator_cc_impl::handle_phase_inc_msg(pmt::pmt_t msg)
     if (pmt::is_dict(msg)) {
         /* New phase increment (mandatory) */
         if (!pmt::dict_has_key(msg, inc_key))
-            throw std::runtime_error("rotator_cc: Control message must contain \"inc\" key");
+            throw std::runtime_error("rotator_cc: Control message "
+                                     "must contain \"inc\" key");
 
-        d_next_phase_inc = pmt::to_double(pmt::dict_ref(msg, inc_key,
-                                                        pmt::PMT_NIL));
+        const double phase_inc = pmt::to_double(pmt::dict_ref(msg, inc_key,
+                                                              pmt::PMT_NIL));
 
         /* Absolute sample offset when update is to be applied (optional) */
-        if (pmt::dict_has_key(msg, offset_key)) {
-            d_idx_next_inc_update = pmt::to_uint64(pmt::dict_ref(msg,
-                                                                 offset_key,
-                                                                 pmt::PMT_NIL));
-        } else {
-            d_idx_next_inc_update = nitems_written(0) + 1; // update right away
-        }
+        const uint64_t update_offset = pmt::dict_has_key(msg, offset_key) ?
+            pmt::to_uint64(pmt::dict_ref(msg, offset_key, pmt::PMT_NIL)) :
+            nitems_written(0) + 1; // update right away when not provided
 
-        d_inc_update_pending  = true;
+        d_inc_update_queue.push(std::make_pair(update_offset, phase_inc));
     } else {
-        throw std::runtime_error("rotator_cc: Control message must be a PMT dictionary");
+        throw std::runtime_error("rotator_cc: Control message must be a PMT "
+                                 "dictionary");
     }
 }
 
@@ -102,10 +100,26 @@ int rotator_cc_impl::work(int noutput_items,
       for (int i=0; i<noutput_items; i++)
       	out[i] = d_r.rotate(in[i]);
 #else
-    int items_before_update, items_after_update;
-    /* If there is a phase increment update scheduled, handle rotation in two
-     * steps and update the phase increment in between. */
+
     const uint64_t n_written = nitems_written(0);
+
+    /* Find out if there is a phase increment update pending */
+    while (!d_inc_update_queue.empty() && !d_inc_update_pending) {
+        auto next_update = d_inc_update_queue.front();
+        d_inc_update_queue.pop();
+
+        if (next_update.first <= n_written)
+            continue; // we didn't process this update on time - skip it
+
+        d_idx_next_inc_update = next_update.first;
+        d_next_phase_inc      = next_update.second;
+
+        d_inc_update_pending  = true;
+    }
+
+    /* If there is a phase increment update scheduled for now, handle rotation
+     * in two steps and update the phase increment in between. */
+    int items_before_update, items_after_update;
     if (d_inc_update_pending &&
         d_idx_next_inc_update > n_written &&
         d_idx_next_inc_update <= (n_written + noutput_items)) {
